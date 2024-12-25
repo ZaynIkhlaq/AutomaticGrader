@@ -5,10 +5,19 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import norm
 
+# Set Streamlit page configurations
+st.set_page_config(
+    page_title="Grading System App",
+    page_icon="📊",
+    layout="centered"
+)
+
 # Set a more attractive Seaborn style/theme
 sns.set_theme(style='whitegrid', palette='pastel')
 
+# -----------------------------
 # Helper Functions
+# -----------------------------
 def read_csv_data(uploaded_file) -> pd.DataFrame:
     """
     Reads a CSV file containing at least two columns: 'StudentID' and 'Score'.
@@ -76,6 +85,7 @@ def assign_letter_grades_from_percentiles(df: pd.DataFrame, grade_col='FinalGrad
     z_scores = df_new['AdjustedScore']
     percentiles = norm.cdf(z_scores)
 
+    # Define percentile cutoffs for letter grades
     letter_bins = {'A': 0.80, 'B': 0.50, 'C': 0.20, 'D': 0.10, 'F': 0.00}
     letter_grades = []
     for p in percentiles:
@@ -94,55 +104,87 @@ def assign_letter_grades_from_percentiles(df: pd.DataFrame, grade_col='FinalGrad
     return df_new
 
 
+# -----------------------------
 # Main Streamlit App
+# -----------------------------
 def main():
-    st.title("Grading System: Absolute vs Relative Grading")
-
+    st.title("📊 Grading System: Absolute vs. Relative Grading")
+    
     st.markdown("""
-    This app lets you choose between **absolute grading** and **relative grading**:
-    - Upload a CSV file with at least two columns: `StudentID` and `Score`.
-    - Select the grading method.
-    - View the results and grade distribution.
+    **Welcome to the Grading System App!**
+
+    This application allows you to:
+    - **Upload a CSV file** containing student scores.
+    - **Choose a grading method**: Absolute or Relative.
+    - **Review the assigned grades** and distribution.
+
+    **Note**: Your CSV file must have **at least** these two columns:
+    - `StudentID`
+    - `Score`
     """)
 
     # Upload CSV file
-    uploaded_file = st.file_uploader("Upload CSV file with columns ['StudentID', 'Score']", type=["csv"])
+    uploaded_file = st.file_uploader(
+        "Upload CSV file with columns ['StudentID', 'Score']",
+        type=["csv"]
+    )
+
     if not uploaded_file:
-        st.warning("Please upload a CSV file to proceed.")
+        st.warning("Please upload a valid CSV file to proceed.")
         return
 
     # Read CSV data
-    df = read_csv_data(uploaded_file)
-    st.subheader("Uploaded Data Preview")
-    st.dataframe(df.head())
+    try:
+        df = read_csv_data(uploaded_file)
+    except Exception as e:
+        st.error(f"Failed to read the file: {e}")
+        return
 
-    # Select Grading Method
-    grading_method = st.selectbox("Choose a Grading Method", ["Absolute Grading", "Relative Grading"])
+    # Display a preview of the uploaded data
+    st.subheader("Data Preview")
+    st.dataframe(df.head(), height=200)
+
+    # Let the user pick a grading method
+    grading_method = st.selectbox(
+        "Choose a Grading Method",
+        ["Absolute Grading", "Relative Grading"]
+    )
     
     if grading_method == "Absolute Grading":
-        # Absolute Grading
         st.subheader("Absolute Grading")
         thresholds = {'A': 90, 'B': 80, 'C': 70, 'D': 60}
-        df['Grade'] = df['Score'].apply(assign_absolute_grade, thresholds=thresholds)
-        st.write("Grades assigned based on absolute thresholds.")
-        st.dataframe(df[['StudentID', 'Score', 'Grade']].head())
         
-        # Display Grade Distribution
+        # Assign grades
+        df['Grade'] = df['Score'].apply(assign_absolute_grade, thresholds=thresholds)
+        
+        st.write("Grades assigned based on these **absolute thresholds**:")
+        st.json(thresholds)
+
+        # Display results
+        st.dataframe(df[['StudentID', 'Score', 'Grade']].head(), height=200)
+        
+        # Grade distribution
+        st.write("### Grade Distribution")
         grade_counts = df['Grade'].value_counts().sort_index()
         st.bar_chart(grade_counts)
 
-    elif grading_method == "Relative Grading":
-        # Relative Grading
+    else:  # Relative Grading
         st.subheader("Relative Grading")
         
         # Transform scores to z-scores
         df_transformed = transform_scores_normal_curve(df)
         df_grades = assign_letter_grades_from_percentiles(df_transformed)
+
+        st.write("Grades assigned based on **percentile ranks** in a normal distribution.")
         
-        st.write("Grades assigned based on percentile ranks (relative grading).")
-        st.dataframe(df_grades[['StudentID', 'Score', 'AdjustedScore', 'FinalGrade']].head())
+        # Display results
+        st.dataframe(
+            df_grades[['StudentID', 'Score', 'AdjustedScore', 'FinalGrade']].head(),
+            height=200
+        )
         
-        # Display Grade Distribution
+        # Grade distribution
+        st.write("### Grade Distribution")
         grade_counts = df_grades['FinalGrade'].value_counts().sort_index()
         st.bar_chart(grade_counts)
 
