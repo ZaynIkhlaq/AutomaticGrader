@@ -1,12 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
 from scipy.stats import norm
-
-# Set a more attractive Seaborn style/theme
-sns.set_theme(style='whitegrid', palette='pastel')
 
 # 1) Define helper functions
 def read_csv_data(filepath: str) -> pd.DataFrame:
@@ -198,15 +194,15 @@ def main():
     st.subheader("Distribution of Numerical Columns")
     for col in numeric_cols:
         fig, ax = plt.subplots()
-        sns.histplot(df[col], kde=True, ax=ax, color='skyblue')
+        ax.hist(df[col], bins='auto', color='skyblue', alpha=0.7, rwidth=0.85)
         ax.set_title(f'Distribution of {col}')
         st.pyplot(fig)
 
     # --- Correlation Matrix
     st.subheader("Correlation Matrix")
-    corr_matrix = df.corr(numeric_only=True)
+    corr_matrix = df.corr()
     fig, ax = plt.subplots()
-    sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', ax=ax)
+    ax.matshow(corr_matrix, cmap='coolwarm')
     st.pyplot(fig)
 
     # --- Statistics about Original Scores
@@ -223,15 +219,15 @@ def main():
 
     # --- Plots of Original Scores
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    sns.histplot(df['Score'], kde=True, ax=axes[0], color='skyblue')
+    axes[0].hist(df['Score'], bins='auto', color='skyblue', alpha=0.7, rwidth=0.85)
     axes[0].set_title("Histogram of Original Scores", fontsize=14)
     axes[0].set_xlabel("Score")
     axes[0].set_ylabel("Count")
 
-    sns.kdeplot(df['Score'], fill=True, ax=axes[1], color='lightcoral')
-    axes[1].set_title("Density Plot of Original Scores", fontsize=14)
-    axes[1].set_xlabel("Score")
-    axes[1].set_ylabel("Density")
+    axes[1].plot(df['Score'], color='lightcoral')
+    axes[1].set_title("Line Plot of Original Scores", fontsize=14)
+    axes[1].set_xlabel("Index")
+    axes[1].set_ylabel("Score")
 
     plt.tight_layout()
     st.pyplot(fig)
@@ -270,7 +266,7 @@ def main():
 
     # Bar plot of final grade distribution
     fig, ax = plt.subplots(figsize=(8, 5))
-    sns.barplot(x=final_counts.index, y=final_counts.values, color='salmon', ax=ax)
+    ax.bar(final_counts.index, final_counts.values, color='salmon')
     ax.set_title(f"Final Grade Distribution ({grading_method.capitalize()})", fontsize=14)
     ax.set_xlabel("Grade")
     ax.set_ylabel("Count")
@@ -286,15 +282,15 @@ def main():
         st.write(f"**Adjusted Std:** {adj_std:.2f}")
 
         fig2, axes2 = plt.subplots(1, 2, figsize=(12, 5))
-        sns.histplot(df_grading['AdjustedScore'], kde=True, ax=axes2[0], color='blueviolet')
+        axes2[0].hist(df_grading['AdjustedScore'], bins='auto', color='blueviolet', alpha=0.7, rwidth=0.85)
         axes2[0].set_title("Histogram of Adjusted Scores", fontsize=14)
         axes2[0].set_xlabel("AdjustedScore")
         axes2[0].set_ylabel("Count")
 
-        sns.kdeplot(df_grading['AdjustedScore'], fill=True, ax=axes2[1], color='goldenrod')
-        axes2[1].set_title("Density Plot of Adjusted Scores", fontsize=14)
-        axes2[1].set_xlabel("AdjustedScore")
-        axes2[1].set_ylabel("Density")
+        axes2[1].plot(df_grading['AdjustedScore'], color='goldenrod')
+        axes2[1].set_title("Line Plot of Adjusted Scores", fontsize=14)
+        axes2[1].set_xlabel("Index")
+        axes2[1].set_ylabel("AdjustedScore")
 
         plt.tight_layout()
         st.pyplot(fig2)
