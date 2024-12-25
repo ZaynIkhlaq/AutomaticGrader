@@ -19,7 +19,7 @@ def read_csv_data(filepath: str) -> pd.DataFrame:
     except FileNotFoundError:
         raise FileNotFoundError(f"Could not find the file: {filepath}")
     except Exception as e:
-        raise Exception(f"An error occurred while reading the CSV: {e}")
+        raise Exception(f"An error occurred while reading the CSV, try again: {e}")
 
     # Basic error handling for missing columns
     required_cols = {'StudentID', 'Score'}
