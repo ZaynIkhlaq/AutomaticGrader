@@ -183,6 +183,36 @@ def main():
             height=200
         )
         
+        # -----------------------------
+        # NEW: Plot the distribution of Adjusted Scores + Normal Curve
+        # -----------------------------
+        st.write("### Adjusted Score Distribution with Normal Curve")
+
+        # Create a new figure
+        fig, ax = plt.subplots(figsize=(8, 5))
+        
+        # Plot histogram of Adjusted Scores (z-scores), with density on the y-axis
+        sns.histplot(df_grades['AdjustedScore'], kde=False, stat='density', ax=ax, color='skyblue', edgecolor='black')
+
+        # Compute mean & std of Adjusted Scores
+        mu = df_grades['AdjustedScore'].mean()
+        sigma = df_grades['AdjustedScore'].std()
+
+        # Range of x values for plotting the PDF
+        x_vals = np.linspace(mu - 3*sigma, mu + 3*sigma, 200)
+        pdf_vals = norm.pdf(x_vals, mu, sigma)
+        
+        # Plot the PDF (normal curve)
+        ax.plot(x_vals, pdf_vals, 'r-', lw=2, label='Normal PDF')
+        
+        ax.set_title("Distribution of Adjusted Scores (Z-Scores) with Normal Curve")
+        ax.set_xlabel("Adjusted Score (Z-Score)")
+        ax.set_ylabel("Density")
+        ax.legend()
+
+        st.pyplot(fig)
+        # -----------------------------
+
         # Grade distribution
         st.write("### Grade Distribution")
         grade_counts = df_grades['FinalGrade'].value_counts().sort_index()
