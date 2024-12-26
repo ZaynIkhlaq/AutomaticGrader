@@ -12,7 +12,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# Set a more attractive Seaborn style/theme
+# Set a Seaborn style/theme
 sns.set_theme(style='whitegrid', palette='pastel')
 
 # -----------------------------
@@ -41,6 +41,7 @@ def assign_absolute_grade(score, thresholds=None):
     """
     if thresholds is None:
         thresholds = {'A': 90, 'B': 80, 'C': 70, 'D': 60}
+    # You can add or change thresholds for E, F, etc.
 
     if score >= thresholds['A']:
         return 'A'
@@ -76,11 +77,10 @@ def transform_scores_normal_curve(df: pd.DataFrame) -> pd.DataFrame:
 
 def assign_letter_grades_from_percentiles(df: pd.DataFrame, grade_col='FinalGrade') -> pd.DataFrame:
     """
-    Assign letter grades based on the percentile of 'AdjustedScore' 
+    Assign letter grades based on the percentile of 'AdjustedScore'
     in a (theoretical) normal distribution.
     """
     df_new = df.copy()
-    # If 'AdjustedScore' does not exist, just use the raw Score
     if 'AdjustedScore' not in df_new.columns:
         df_new['AdjustedScore'] = df_new['Score']
 
@@ -90,10 +90,10 @@ def assign_letter_grades_from_percentiles(df: pd.DataFrame, grade_col='FinalGrad
 
     # Define percentile cutoffs for letter grades
     letter_bins = {
-        'A': 0.80, 
-        'B': 0.50, 
-        'C': 0.20, 
-        'D': 0.10, 
+        'A': 0.80,
+        'B': 0.50,
+        'C': 0.20,
+        'D': 0.10,
         'F': 0.00
     }
     letter_grades = []
@@ -112,6 +112,88 @@ def assign_letter_grades_from_percentiles(df: pd.DataFrame, grade_col='FinalGrad
     df_new[grade_col] = letter_grades
     return df_new
 
+
+def plot_score_distribution(df, score_col='Score', label='Score Distribution'):
+    """
+    Plots a histogram + KDE + theoretical Normal PDF based on the data's mean & std.
+    """
+    fig, ax = plt.subplots(figsize=(8, 5))
+
+    # Plot histogram (density = True)
+    sns.histplot(
+        df[score_col], 
+        bins=15, 
+        stat='density', 
+        color='skyblue', 
+        alpha=0.6,
+        edgecolor='black',
+        label='Histogram',
+        ax=ax
+    )
+    # KDE plot
+    sns.kdeplot(
+        df[score_col],
+        color='blue',
+        linewidth=2,
+        label='KDE',
+        ax=ax
+    )
+
+    # Theoretical normal curve with sample mean/std
+    mean_val = df[score_col].mean()
+    std_val = df[score_col].std()
+
+    # Guard against zero std (all scores identical)
+    if std_val > 0:
+        x_vals = np.linspace(df[score_col].min(), df[score_col].max(), 200)
+        pdf_vals = norm.pdf(x_vals, mean_val, std_val)
+        ax.plot(x_vals, pdf_vals, 'r--', lw=2, label='Normal PDF')
+
+    ax.set_title(label)
+    ax.set_xlabel(score_col)
+    ax.set_ylabel("Density")
+    ax.legend()
+    st.pyplot(fig)
+
+
+def plot_grade_vs_avg_score(df, grade_col='Grade', score_col='Score', possible_grades=None):
+    """
+    Plots a simple line plot of average score by letter grade, in the order given.
+    """
+    # If the user doesn't supply an order, we try a default
+    # (If you have A, B, C, D, E, F or something else, you can adjust.)
+    if possible_grades is None:
+        # For the "Absolute Grading" example (A,B,C,D,F).
+        # For "Relative Grading," it's also A,B,C,D,F.
+        possible_grades = ["A", "B", "C", "D", "F"]
+
+    # Group by grade and compute average
+    grade_means = (
+        df.groupby(grade_col)[score_col]
+        .mean()
+        .reindex(possible_grades)
+    )
+
+    # Sometimes certain grades might not appear in the dataset at all.
+    # We'll drop NaNs if the grade doesn't appear
+    grade_means = grade_means.dropna()
+
+    fig, ax = plt.subplots(figsize=(6,4))
+    sns.lineplot(
+        x=grade_means.index,
+        y=grade_means.values,
+        marker='o',
+        color="purple",
+        linewidth=2,
+        ax=ax
+    )
+    ax.set_title(f"Average {score_col} by Letter Grade")
+    ax.set_xlabel("Letter Grade")
+    ax.set_ylabel(f"Average {score_col}")
+    ax.set_ylim(0, 100)  # Assuming scores from 0 to 100
+    st.pyplot(fig)
+
+
 # -----------------------------
 # Main Streamlit App
 # -----------------------------
@@ -124,8 +206,10 @@ def main():
     This application allows you to:
     - **Upload a CSV file** containing student scores.
     - **Choose a grading method**: Absolute or Relative.
-    - **Review the assigned grades** and distribution.
-
+    - **Review the assigned grades** and distribution, including:
+        - A histogram + normal curve of your scores
+        - A line plot of *average score* by letter grade
+    
     **Note**: Your CSV file must have **at least** these two columns:
     - `StudentID`
     - `Score`
@@ -161,86 +245,100 @@ def main():
     if grading_method == "Absolute Grading":
         st.subheader("Absolute Grading")
         thresholds = {'A': 90, 'B': 80, 'C': 70, 'D': 60}
-        
+
         # Assign grades
         df['Grade'] = df['Score'].apply(assign_absolute_grade, thresholds=thresholds)
-        
+
         st.write("Grades assigned based on these **absolute thresholds**:")
         st.json(thresholds)
 
-        # Display results
+        # Show some rows
         st.dataframe(df[['StudentID', 'Score', 'Grade']].head(), height=200)
-        
-        # Grade distribution
-        st.write("### Grade Distribution")
+
+        # Plot distribution (raw scores)
+        st.write("### Score Distribution (Histogram + Normal Curve)")
+        plot_score_distribution(df, score_col='Score', label="Distribution of Raw Scores")
+
+        # Grade distribution (counts)
+        st.write("### Grade Distribution (Counts)")
         grade_counts = df['Grade'].value_counts().sort_index()
         st.bar_chart(grade_counts)
 
+        # Plot average score by letter grade
+        st.write("### Average Score by Letter Grade")
+        plot_grade_vs_avg_score(df, grade_col='Grade', score_col='Score', 
+                                possible_grades=["A","B","C","D","F"])
+
     else:
         st.subheader("Relative Grading")
-        
+
         # Transform scores to z-scores
         df_transformed = transform_scores_normal_curve(df)
+        # Assign letter grades from percentile cutoffs
         df_grades = assign_letter_grades_from_percentiles(df_transformed)
 
         st.write("Grades assigned based on **percentile ranks** in a normal distribution.")
-        
-        # Display results
+
         st.dataframe(
             df_grades[['StudentID', 'Score', 'AdjustedScore', 'FinalGrade']].head(),
             height=200
         )
-        
-        # -----------------------------------------------------
-        # Enhanced Plot: Adjusted Score Distribution + Normal Curve
-        # -----------------------------------------------------
-        st.write("### Adjusted Score Distribution with Normal Curve")
+
+        # Plot distribution of *raw* scores or of *AdjustedScore*? Let's do both.
+        # First, raw scores:
+        st.write("### Raw Score Distribution (Histogram + Normal Curve)")
+        plot_score_distribution(df_grades, score_col='Score', label="Distribution of Raw Scores")
+
+        # Then, adjusted z-scores:
+        st.write("### Adjusted Score (Z-Score) Distribution + Std Normal")
         fig, ax = plt.subplots(figsize=(8, 5))
 
-        # Plot histogram of Adjusted Scores (z-scores), with density on the y-axis
-        # Increase bins, add some transparency, and remove the black edgecolor if you like
+        # Histogram of z-scores
         sns.histplot(
             df_grades['AdjustedScore'], 
-            bins=20,                    # You can tweak this number
-            stat='density', 
-            color='skyblue', 
-            alpha=0.7, 
+            bins=15,
+            stat='density',
+            color='skyblue',
+            alpha=0.7,
             edgecolor='black',
-            ax=ax,
-            label='Histogram'
+            label='Histogram',
+            ax=ax
         )
-
-        # Overlay a KDE for a smoother visualization
+        # KDE
         sns.kdeplot(
-            df_grades['AdjustedScore'], 
-            color='blue', 
-            linewidth=2, 
-            ax=ax,
-            label='KDE'
+            df_grades['AdjustedScore'],
+            color='blue',
+            linewidth=2,
+            label='KDE',
+            ax=ax
         )
-
-        # Because we used z-scores, the theoretical normal distribution 
-        # is Standard Normal: mean=0, std=1
+        # Theoretical standard normal curve
         x_vals = np.linspace(-4, 4, 200)
         pdf_vals = norm.pdf(x_vals, 0, 1)
-
-        # Plot the PDF (standard normal) as a dashed red line
         ax.plot(x_vals, pdf_vals, 'r--', lw=2, label='Std Normal PDF')
-        
+
         ax.set_title("Distribution of Adjusted Scores (Z-Scores)")
-        ax.set_xlabel("Adjusted Score (Z-Score)")
+        ax.set_xlabel("Adjusted Score")
         ax.set_ylabel("Density")
         ax.legend()
-
         st.pyplot(fig)
-        # -----------------------------------------------------
 
-        # Grade distribution
-        st.write("### Grade Distribution")
+        # Grade distribution (counts)
+        st.write("### Grade Distribution (Counts)")
         grade_counts = df_grades['FinalGrade'].value_counts().sort_index()
         st.bar_chart(grade_counts)
 
+        # Plot average *raw* score by letter grade
+        st.write("### Average Raw Score by Letter Grade (Relative Grading)")
+        plot_grade_vs_avg_score(
+            df_grades, 
+            grade_col='FinalGrade', 
+            score_col='Score', 
+            possible_grades=["A","B","C","D","F"]
+        )
+
     st.success("Grading completed successfully!")
 
+# Run the app
 if __name__ == '__main__':
     main()
