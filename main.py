@@ -27,6 +27,7 @@ def read_csv_data(uploaded_file) -> pd.DataFrame:
         df = pd.read_csv(uploaded_file)
     except Exception as e:
         raise Exception(f"Error while reading the CSV: {e}")
+
     required_cols = {'StudentID', 'Score'}
     if not required_cols.issubset(df.columns):
         raise ValueError(f"CSV must have columns {required_cols}")
@@ -58,7 +59,9 @@ def transform_scores_normal_curve(df: pd.DataFrame) -> pd.DataFrame:
     df_new = df.copy()
     mean_ = df['Score'].mean()
     std_ = df['Score'].std()
+
     if std_ == 0:
+        # All scores identical, no transformation
         df_new['AdjustedScore'] = df['Score']
     else:
         df_new['AdjustedScore'] = (df['Score'] - mean_) / std_
@@ -73,7 +76,8 @@ def assign_letter_grades_from_percentiles(df: pd.DataFrame, grade_col='FinalGrad
         df_new['AdjustedScore'] = df_new['Score']
 
     z_scores = df_new['AdjustedScore']
-    percentiles = norm.cdf(z_scores)  # convert z to percentile
+    # Convert z-scores to percentiles
+    percentiles = norm.cdf(z_scores)
 
     # Typical percentile cutoffs
     cutoffs = {'A': 0.80, 'B': 0.50, 'C': 0.20, 'D': 0.10, 'F': 0.00}
@@ -105,7 +109,7 @@ def plot_distribution(df, col='Score', title='Score Distribution'):
     mean_val = df[col].mean()
     std_val = df[col].std()
     if std_val > 0:
-        # Theoretical PDF
+        # Theoretical Normal PDF
         x_vals = np.linspace(df[col].min(), df[col].max(), 200)
         pdf_vals = norm.pdf(x_vals, loc=mean_val, scale=std_val)
         ax.plot(x_vals, pdf_vals, 'r--', lw=2, label='Normal PDF')
@@ -118,7 +122,7 @@ def plot_distribution(df, col='Score', title='Score Distribution'):
 
 def plot_grade_distribution(df, grade_col='Grade', title='Grade Distribution'):
     """
-    Bar chart of how many students got each grade.
+    Bar chart showing how many students got each grade.
     """
     fig, ax = plt.subplots(figsize=(6,4))
     order = sorted(df[grade_col].unique())
@@ -131,14 +135,14 @@ def plot_grade_distribution(df, grade_col='Grade', title='Grade Distribution'):
 def plot_grade_vs_score(df, grade_col='Grade', score_col='Score',
                         all_grades=None, title='Average Score by Grade'):
     """
-    Plots a line chart: X=Grade, Y=avg Score. 
+    Plots a line chart: X=Grade, Y=Average Score.
     """
     if all_grades is None:
         all_grades = sorted(df[grade_col].unique())
 
     # Safely compute average score for each grade
     means = df.groupby(grade_col)[score_col].mean().reindex(all_grades)
-    means = means.dropna()  # just in case some grades aren't present
+    means = means.dropna()  # remove missing if a grade wasn't assigned
 
     fig, ax = plt.subplots(figsize=(6,4))
     sns.lineplot(
@@ -160,12 +164,14 @@ def plot_grade_vs_score(df, grade_col='Grade', score_col='Score',
 # -----------------------------
 def main():
     st.title("📊 Grading System: Absolute vs. Relative Grading")
+
     st.markdown("""
     This app lets you:
-    1. **Upload** a CSV with *StudentID* and *Score*.
+    1. **Upload** a CSV with **StudentID** and **Score**.
     2. **Choose** Absolute or Relative grading.
     3. **View** distribution plots and final grade counts.
     4. **See** a line chart of *Grade vs. Average Score*.
+    5. **Check** how many got a specific Grade at each Score.
     """)
 
     # 1. File upload
@@ -215,6 +221,11 @@ def main():
             title="Average Score by Grade (Absolute)"
         )
 
+        # Show how many got a specific grade at each score
+        st.subheader("Grade vs. Score Details")
+        abs_counts = df.groupby(["Grade", "Score"]).size().reset_index(name="Count")
+        st.dataframe(abs_counts)
+
     else:
         st.subheader("Relative Grading")
         df_transformed = transform_scores_normal_curve(df)
@@ -252,8 +263,14 @@ def main():
             title="Average Score by Grade (Relative)"
         )
 
-    st.success("Grading and analysis completed successfully!")
+        # Show how many got a specific grade at each score
+        st.subheader("Grade vs. Score Details")
+        # We'll rename 'FinalGrade' to 'Grade' for simpler grouping
+        df_grades = df_grades.rename(columns={"FinalGrade": "Grade"})
+        rel_counts = df_grades.groupby(["Grade", "Score"]).size().reset_index(name="Count")
+        st.dataframe(rel_counts)
 
+    st.success("Grading and analysis completed successfully!")
 
 if __name__ == "__main__":
     main()
