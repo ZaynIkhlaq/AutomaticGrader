@@ -80,7 +80,7 @@ def assign_letter_grades_from_percentiles(df: pd.DataFrame,
     z_scores = df_new['AdjustedScore']
     percentiles = norm.cdf(z_scores)
 
-    # Some typical percentile cutoffs:
+    # Typical percentile cutoffs (adjust as needed)
     cutoffs = {'A': 0.80, 'B': 0.50, 'C': 0.20, 'D': 0.10, 'F': 0.00}
     letter_grades = []
     for p in percentiles:
@@ -127,7 +127,7 @@ def plot_distribution(df, col='Score', title='Score Distribution'):
 
 def plot_grade_distribution(df, grade_col='Grade', title='Grade Distribution'):
     """
-    Bar chart of how many students got each grade.
+    Bar chart showing how many students got each grade.
     """
     fig, ax = plt.subplots(figsize=(6,4))
     order = sorted(df[grade_col].unique())
@@ -261,7 +261,7 @@ def main():
         plot_grade_distribution(df_grades, grade_col='FinalGrade', 
                                 title='Final Grade Distribution (Relative)')
 
-        # Finally, the EXACT Grade vs. Score PLOT you wanted:
+        # Finally, the EXACT Grade vs. Score PLOT:
         plot_grade_vs_score(
             df_grades,
             grade_col='FinalGrade',
